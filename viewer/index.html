@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS 인프라 명세서 뷰어 & 엑셀 생성기 (고객사 납품용)</title>
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- ExcelJS (로컬 번들 우선 + CDN 폴백) -->
+  <script src="vendor/exceljs.min.js"></script>
+  <script>
+    if (typeof ExcelJS === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"><\/script>');
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Pretendard', sans-serif; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- 헤더 -->
+  <header class="bg-slate-900 border-b border-slate-800 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow">
+          <i class="fa-solid fa-cloud text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight">AWS 인프라 생성 명세서 변환기</h1>
+          <p class="text-xs text-slate-400">CloudShell JSON 업로드 ➔ 브라우저 검토 ➔ 고객사 제출용 엑셀 (.xlsx) 추출</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+          <i class="fa-solid fa-shield-check mr-1.5"></i> 100% 로컬 브라우저 처리 (데이터 외부 전송 없음)
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 컨테이너 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- 1. 파일 업로드 (Drag & Drop) 영역 -->
+    <div id="drop-zone"
+      class="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-10 text-center bg-white transition duration-200 cursor-pointer shadow-sm">
+      <input type="file" id="file-input" accept=".json" class="hidden">
+      <div class="max-w-md mx-auto space-y-3">
+        <div class="w-16 h-16 mx-auto rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl shadow-inner">
+          <i class="fa-solid fa-file-arrow-up"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-800">CloudShell에서 추출한 JSON 파일을 올려주세요</h3>
+          <p class="text-xs text-slate-500 mt-1">
+            여기로 파일을 <strong class="text-blue-600">Drag & Drop</strong> 하거나 <strong class="text-blue-600">클릭</strong>하여 선택 (<span class="font-mono">aws_spec_*.json</span>)
+          </p>
+        </div>
+        <p class="text-[11px] text-slate-400 bg-slate-100 py-1.5 px-3 rounded-lg inline-block">
+          💡 보안 인증: 업로드한 인프라 데이터는 서버로 전송되지 않고 브라우저 메모리 안에서만 즉시 처리됩니다.
+        </p>
+      </div>
+    </div>
+
+    <!-- 2. 대시보드 영역 (JSON 로드 후 활성화) -->
+    <div id="dashboard-area" class="hidden space-y-6">
+
+      <!-- 고객사 명칭 설정 및 엑셀 다운로드 바 -->
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-lg flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="w-full md:w-auto flex-grow max-w-xl">
+          <div class="flex items-center space-x-3 mb-2 text-xs">
+            <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500 text-slate-950">스캔 데이터 로드됨</span>
+            <span>리전: <strong class="text-amber-400 font-mono" id="meta-region">-</strong></span>
+            <span>계정 ID: <strong class="text-slate-200 font-mono" id="meta-account">-</strong></span>
+            <span>스캔시각: <strong class="text-slate-300" id="meta-scanned-at">-</strong></span>
+          </div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">고객사 명칭 (엑셀 표지 기재용)</label>
+          <div class="flex items-center space-x-2">
+            <div class="relative flex-grow">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <i class="fa-solid fa-building text-sm"></i>
+              </span>
+              <input type="text" id="customer-input" value="(주)고객사" placeholder="고객사명 입력"
+                class="w-full pl-9 pr-3 py-2 bg-slate-800/80 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <button onclick="document.getElementById('file-input').click()"
+              class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition">
+              <i class="fa-solid fa-rotate-left mr-1"></i> 파일 다시 선택
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-shrink-0">
+          <button onclick="exportExcel()"
+            class="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl shadow-lg hover:shadow-emerald-900/30 transition flex items-center space-x-2.5 text-sm">
+            <i class="fa-solid fa-file-excel text-xl"></i>
+            <span>고객사 제출용 엑셀 명세서 다운로드 (.xlsx)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Skipped 권한 안내 배너 (해당 시 표시) -->
+      <div id="skipped-alert" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-circle-exclamation text-amber-600 text-base"></i>
+          <span>IAM 권한 부족으로 다음 자원은 안전하게 건너뛰었습니다: <strong id="skipped-list" class="font-mono"></strong></span>
+        </div>
+        <span class="text-amber-600 font-semibold">스캔 정상 완료</span>
+      </div>
+
+      <!-- KPI 카드 -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-[11px] font-medium text-slate-400 uppercase">VPC</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-vpc">0</p>
+          <span class="text-[11px] text-blue-600 font-medium">가상 네트워크</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-[11px] font-medium text-slate-400 uppercase">서브넷</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-subnet">0</p>
+          <span class="text-[11px] text-indigo-600 font-medium">Public/Private</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-[11px] font-medium text-slate-400 uppercase">보안 그룹</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-sg">0</p>
+          <span class="text-[11px] text-emerald-600 font-medium">방화벽 규칙</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-[11px] font-medium text-slate-400 uppercase">EC2 서버</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-ec2">0</p>
+          <span class="text-[11px] text-amber-600 font-medium">컴퓨팅 인스턴스</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-[11px] font-medium text-slate-400 uppercase">RDS / Aurora</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-rds">0</p>
+          <span class="text-[11px] text-rose-600 font-medium">데이터베이스</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-[11px] font-medium text-slate-400 uppercase">로드밸런서</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-elb">0</p>
+          <span class="text-[11px] text-purple-600 font-medium">ALB / NLB</span>
+        </div>
+      </div>
+
+      <!-- 탭형 테이블 미리보기 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- 탭 헤더 -->
+        <div class="border-b border-slate-200 bg-slate-50/70 px-4 flex flex-wrap gap-2 pt-3">
+          <button onclick="switchTab('tab-network')" id="btn-tab-network"
+            class="tab-btn px-4 py-2.5 text-xs font-bold border-b-2 border-blue-600 text-blue-600">
+            <i class="fa-solid fa-network-wired mr-1.5"></i> 네트워크 (VPC & Subnet)
+          </button>
+          <button onclick="switchTab('tab-gateways')" id="btn-tab-gateways"
+            class="tab-btn px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-route mr-1.5"></i> 게이트웨이 & 라우팅
+          </button>
+          <button onclick="switchTab('tab-security')" id="btn-tab-security"
+            class="tab-btn px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-shield-halved mr-1.5"></i> 보안 그룹 (SG)
+          </button>
+          <button onclick="switchTab('tab-compute')" id="btn-tab-compute"
+            class="tab-btn px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-server mr-1.5"></i> 컴퓨팅 (EC2)
+          </button>
+          <button onclick="switchTab('tab-database')" id="btn-tab-database"
+            class="tab-btn px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-database mr-1.5"></i> 데이터베이스 (RDS)
+          </button>
+          <button onclick="switchTab('tab-elb')" id="btn-tab-elb"
+            class="tab-btn px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-arrows-split-up-and-left mr-1.5"></i> 로드밸런서 (ELB)
+          </button>
+          <button onclick="switchTab('tab-storage')" id="btn-tab-storage"
+            class="tab-btn px-4 py-2.5 text-xs font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-box-archive mr-1.5"></i> S3 & Lambda
+          </button>
+        </div>
+
+        <!-- 탭 컨텐츠 -->
+        <div class="p-6">
+          <!-- 1. 네트워크 -->
+          <div id="tab-network" class="tab-content active space-y-6">
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase mb-2 flex items-center">
+                <span class="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>VPC 목록
+              </h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase">
+                    <tr>
+                      <th class="p-3">이름 (Name)</th>
+                      <th class="p-3">VPC ID</th>
+                      <th class="p-3">IPv4 CIDR</th>
+                      <th class="p-3">기본 여부</th>
+                      <th class="p-3">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-vpc" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase mb-2 flex items-center">
+                <span class="w-2 h-2 rounded-full bg-indigo-600 mr-2"></span>서브넷 (Subnet) 상세 명세
+              </h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-72">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                    <tr>
+                      <th class="p-3">서브넷 이름</th>
+                      <th class="p-3">Subnet ID</th>
+                      <th class="p-3">소속 VPC</th>
+                      <th class="p-3">CIDR</th>
+                      <th class="p-3">가용영역</th>
+                      <th class="p-3">망 구분</th>
+                      <th class="p-3">가용 IP</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-subnet" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 게이트웨이 & 라우팅 -->
+          <div id="tab-gateways" class="tab-content space-y-6">
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">인터넷 게이트웨이 (IGW) & NAT Gateway</h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase">
+                    <tr>
+                      <th class="p-3">구분</th>
+                      <th class="p-3">게이트웨이 이름</th>
+                      <th class="p-3">자원 ID</th>
+                      <th class="p-3">소속 VPC</th>
+                      <th class="p-3">공인 IP (EIP)</th>
+                      <th class="p-3">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-gateways" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">라우팅 테이블 (Route Tables)</h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-60">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                    <tr>
+                      <th class="p-3">이름</th>
+                      <th class="p-3">RTB ID</th>
+                      <th class="p-3">소속 VPC</th>
+                      <th class="p-3">연결 서브넷</th>
+                      <th class="p-3">기본 게이트웨이 (0.0.0.0/0)</th>
+                      <th class="p-3">주요 라우팅 요약</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-rtb" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 보안 그룹 -->
+          <div id="tab-security" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">보안그룹 이름</th>
+                    <th class="p-3">Group ID</th>
+                    <th class="p-3">소속 VPC</th>
+                    <th class="p-3">인바운드 허용 룰 요약</th>
+                    <th class="p-3">설명</th>
+                  </tr>
+                </thead>
+                <tbody id="table-sg" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 4. 컴퓨팅 (EC2) -->
+          <div id="tab-compute" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">인스턴스 이름</th>
+                    <th class="p-3">Instance ID</th>
+                    <th class="p-3">상태</th>
+                    <th class="p-3">타입</th>
+                    <th class="p-3">Private IP</th>
+                    <th class="p-3">Public IP</th>
+                    <th class="p-3">서브넷 ID</th>
+                    <th class="p-3">가용영역</th>
+                    <th class="p-3">EBS 용량</th>
+                  </tr>
+                </thead>
+                <tbody id="table-ec2" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 5. 데이터베이스 (RDS) -->
+          <div id="tab-database" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">DB 식별자</th>
+                    <th class="p-3">상태</th>
+                    <th class="p-3">엔진 및 버전</th>
+                    <th class="p-3">인스턴스 클래스</th>
+                    <th class="p-3">스토리지</th>
+                    <th class="p-3">Multi-AZ</th>
+                    <th class="p-3">엔드포인트 주소</th>
+                  </tr>
+                </thead>
+                <tbody id="table-rds" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 6. 로드밸런서 (ELB) -->
+          <div id="tab-elb" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">LB 이름</th>
+                    <th class="p-3">타입</th>
+                    <th class="p-3">스킴</th>
+                    <th class="p-3">상태</th>
+                    <th class="p-3">DNS 엔드포인트</th>
+                    <th class="p-3">리스너 포트</th>
+                  </tr>
+                </thead>
+                <tbody id="table-elb" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 7. S3 & Lambda -->
+          <div id="tab-storage" class="tab-content space-y-6">
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">S3 버킷</h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-48">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                    <tr>
+                      <th class="p-3">버킷 이름</th>
+                      <th class="p-3">배치 리전</th>
+                      <th class="p-3">기본 암호화</th>
+                      <th class="p-3">버전 관리</th>
+                      <th class="p-3">생성 일시</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-s3" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="text-xs font-bold text-slate-700 uppercase mb-2">Lambda 함수</h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-48">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                    <tr>
+                      <th class="p-3">함수 이름</th>
+                      <th class="p-3">런타임</th>
+                      <th class="p-3">메모리</th>
+                      <th class="p-3">타임아웃</th>
+                      <th class="p-3">핸들러</th>
+                      <th class="p-3">최근 수정일시</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-lambda" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="mt-12 py-6 border-t border-slate-200 text-center text-xs text-slate-400">
+    <p>AWS CloudShell Specification Viewer &bull; 100% Client-Side Engine</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

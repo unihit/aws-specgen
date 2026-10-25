@@ -1,0 +1,224 @@
+{
+  "meta": {
+    "schema_version": "1.0",
+    "scanned_at": "2026-10-25T07:15:00+00:00",
+    "region": "ap-northeast-2",
+    "account_id": "123456789012",
+    "caller_arn": "arn:aws:sts::123456789012:assumed-role/CloudShellUser",
+    "skipped": [],
+    "errors": [],
+    "warnings": []
+  },
+  "resources": {
+    "vpcs": [
+      {
+        "id": "vpc-0a1b2c3d4e5f6001",
+        "name": "prd-vpc-main",
+        "cidr": "10.0.0.0/16",
+        "is_default": false,
+        "state": "available",
+        "dhcp": "dopt-012345"
+      },
+      {
+        "id": "vpc-0a1b2c3d4e5f6002",
+        "name": "default",
+        "cidr": "172.31.0.0/16",
+        "is_default": true,
+        "state": "available",
+        "dhcp": "dopt-012345"
+      }
+    ],
+    "subnets": [
+      {
+        "id": "subnet-01a2b3c4d5001",
+        "name": "prd-pub-sub-2a",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "cidr": "10.0.1.0/24",
+        "az": "ap-northeast-2a",
+        "type": "Public",
+        "available_ips": 250,
+        "state": "available"
+      },
+      {
+        "id": "subnet-01a2b3c4d5002",
+        "name": "prd-pub-sub-2c",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "cidr": "10.0.2.0/24",
+        "az": "ap-northeast-2c",
+        "type": "Public",
+        "available_ips": 251,
+        "state": "available"
+      },
+      {
+        "id": "subnet-01a2b3c4d5003",
+        "name": "prd-app-sub-2a",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "cidr": "10.0.11.0/24",
+        "az": "ap-northeast-2a",
+        "type": "Private",
+        "available_ips": 249,
+        "state": "available"
+      },
+      {
+        "id": "subnet-01a2b3c4d5004",
+        "name": "prd-app-sub-2c",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "cidr": "10.0.12.0/24",
+        "az": "ap-northeast-2c",
+        "type": "Private",
+        "available_ips": 250,
+        "state": "available"
+      }
+    ],
+    "internet_gateways": [
+      {
+        "id": "igw-0987654321fedcba",
+        "name": "prd-igw",
+        "attached_vpcs": ["vpc-0a1b2c3d4e5f6001"],
+        "state": "available"
+      }
+    ],
+    "nat_gateways": [
+      {
+        "id": "nat-0112233445566778",
+        "name": "prd-nat-2a",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "subnet_id": "subnet-01a2b3c4d5001",
+        "state": "available",
+        "public_ips": ["43.201.10.55"]
+      }
+    ],
+    "route_tables": [
+      {
+        "id": "rtb-0123456789abcdef",
+        "name": "prd-pub-rtb",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "associated_subnets": ["subnet-01a2b3c4d5001", "subnet-01a2b3c4d5002"],
+        "is_main": false,
+        "default_gateway": "igw-0987654321fedcba",
+        "routes_summary": "10.0.0.0/16->local | 0.0.0.0/0->igw-0987654321fedcba"
+      }
+    ],
+    "security_groups": [
+      {
+        "id": "sg-0102030405060708",
+        "name": "prd-alb-sg",
+        "group_name": "prd-alb-sg",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "description": "ALB 외부 허용 보안그룹",
+        "inbound_rules_summary": "[TCP:80 from 0.0.0.0/0] \n[TCP:443 from 0.0.0.0/0]",
+        "inbound_rule_count": 2
+      },
+      {
+        "id": "sg-0203040506070809",
+        "name": "prd-was-sg",
+        "group_name": "prd-was-sg",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "description": "WAS 내부 허용 보안그룹",
+        "inbound_rules_summary": "[TCP:8080 from sg-0102030405060708]",
+        "inbound_rule_count": 1
+      }
+    ],
+    "ec2_instances": [
+      {
+        "id": "i-0123456789abcdef0",
+        "name": "prd-was-01",
+        "type": "m6i.large",
+        "state": "running",
+        "az": "ap-northeast-2a",
+        "private_ip": "10.0.11.20",
+        "public_ip": "-",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "subnet_id": "subnet-01a2b3c4d5003",
+        "platform": "Amazon Linux 2023",
+        "ami": "ami-0123456789abcdef0",
+        "key_name": "prd-keypair",
+        "iam_profile": "EC2-SSM-Role",
+        "security_groups": ["sg-0203040506070809"],
+        "ebs_total_gb": 100,
+        "launch_time": "2026-10-20T09:00:00+00:00"
+      },
+      {
+        "id": "i-0123456789abcdef1",
+        "name": "prd-was-02",
+        "type": "m6i.large",
+        "state": "running",
+        "az": "ap-northeast-2c",
+        "private_ip": "10.0.12.35",
+        "public_ip": "-",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "subnet_id": "subnet-01a2b3c4d5004",
+        "platform": "Amazon Linux 2023",
+        "ami": "ami-0123456789abcdef0",
+        "key_name": "prd-keypair",
+        "iam_profile": "EC2-SSM-Role",
+        "security_groups": ["sg-0203040506070809"],
+        "ebs_total_gb": 100,
+        "launch_time": "2026-10-20T09:05:00+00:00"
+      }
+    ],
+    "rds_instances": [
+      {
+        "id": "prd-mysql-cluster-writer",
+        "name": "prd-mysql-cluster-writer",
+        "engine": "aurora-mysql",
+        "version": "8.0.mysql_aurora.3.04.0",
+        "class": "db.r6g.large",
+        "status": "available",
+        "multi_az": true,
+        "az": "ap-northeast-2a",
+        "storage_gb": 100,
+        "storage_type": "aurora",
+        "encrypted": true,
+        "endpoint": "prd-mysql.cluster-xyz.ap-northeast-2.rds.amazonaws.com",
+        "port": 3306,
+        "publicly_accessible": false,
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "backup_retention_days": 7,
+        "deletion_protection": true,
+        "cluster_id": "prd-mysql-cluster"
+      }
+    ],
+    "load_balancers": [
+      {
+        "name": "prd-external-alb",
+        "type": "APPLICATION",
+        "scheme": "internet-facing",
+        "state": "active",
+        "dns": "prd-alb-123456789.ap-northeast-2.elb.amazonaws.com",
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "azs": ["ap-northeast-2a", "ap-northeast-2c"],
+        "security_groups": ["sg-0102030405060708"],
+        "listeners": ["HTTP:80", "HTTPS:443"],
+        "target_groups": ["prd-tg-was-8080"],
+        "created": "2026-10-18T10:00:00+00:00"
+      }
+    ],
+    "s3_buckets": [
+      {
+        "name": "prd-customer-static-assets",
+        "region": "ap-northeast-2",
+        "created": "2026-10-10T11:20:00+00:00",
+        "versioning": "Enabled",
+        "encryption": "AES256",
+        "public_access_blocked": true
+      }
+    ],
+    "lambda_functions": [
+      {
+        "name": "prd-image-thumbnailer",
+        "runtime": "python3.11",
+        "memory_mb": 512,
+        "timeout_s": 30,
+        "handler": "lambda_function.lambda_handler",
+        "arch": "x86_64",
+        "package_type": "Zip",
+        "code_size_bytes": 1048576,
+        "vpc_id": "vpc-0a1b2c3d4e5f6001",
+        "role": "prd-lambda-role",
+        "state": "Active",
+        "last_modified": "2026-10-21T18:22:10+00:00"
+      }
+    ]
+  }
+}

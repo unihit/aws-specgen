@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AWS 인프라 생성 명세서 생성기 (고객사 제출용)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Pretendard', sans-serif; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- 상단 네비게이션 헤더 -->
+  <header class="bg-slate-900 border-b border-slate-800 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow">
+          <i class="fa-solid fa-cloud text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight">AWS 인프라 생성 명세서 생성기</h1>
+          <p class="text-xs text-slate-400">고객사 제출용 핵심 코어 & 네트워크 엑셀 보고서 추출 솔루션</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+          <span class="w-2 h-2 mr-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+          CloudShell 환경 감지
+        </span>
+        <span id="header-region-badge" class="text-xs bg-slate-800 px-3 py-1 rounded-md text-slate-300 border border-slate-700">
+          기본 리전: <strong class="text-amber-400" id="detected-region-text">{{ default_region }}</strong>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 컨테이너 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- 설정 및 스캔 컨트롤 패널 -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1">고객사 명칭 (엑셀 표지 표기)</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <i class="fa-solid fa-building"></i>
+              </span>
+              <input type="text" id="customer-name" value="고객사" placeholder="예: (주)한국엔터프라이즈"
+                class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
+            </div>
+            <p class="text-xs text-slate-400 mt-1">엑셀 보고서 표지와 요약 시트에 고객사 공식 명칭으로 기재됩니다.</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1">기준 스캔 리전 (Region)</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <i class="fa-solid fa-globe"></i>
+              </span>
+              <select id="target-region"
+                class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm bg-white">
+                <option value="ap-northeast-2" {% if default_region == 'ap-northeast-2' %}selected{% endif %}>아시아 태평양 (서울) - ap-northeast-2 [추천]</option>
+                <option value="ap-northeast-1" {% if default_region == 'ap-northeast-1' %}selected{% endif %}>아시아 태평양 (도쿄) - ap-northeast-1</option>
+                <option value="us-east-1" {% if default_region == 'us-east-1' %}selected{% endif %}>미국 동부 (버지니아 북부) - us-east-1</option>
+                <option value="us-west-2" {% if default_region == 'us-west-2' %}selected{% endif %}>미국 서부 (오레곤) - us-west-2</option>
+                <option value="ap-southeast-1" {% if default_region == 'ap-southeast-1' %}selected{% endif %}>아시아 태평양 (싱가포르) - ap-southeast-1</option>
+                <option value="eu-central-1" {% if default_region == 'eu-central-1' %}selected{% endif %}>유럽 (프랑크푸르트) - eu-central-1</option>
+              </select>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">CloudShell을 실행한 세션 리전이 기본으로 자동 선택되어 있습니다.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <button id="btn-scan" onclick="startScan()"
+            class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium rounded-lg shadow transition flex items-center space-x-2 text-sm">
+            <i class="fa-solid fa-satellite-dish"></i>
+            <span>인프라 자원 스캔 시작</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 로딩 스피너 -->
+    <div id="loading-spinner" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center my-8">
+      <div class="inline-block animate-spin text-blue-600 text-4xl mb-3">
+        <i class="fa-solid fa-circle-notch"></i>
+      </div>
+      <h3 class="text-base font-semibold text-slate-800">AWS 핵심 인프라 자원을 스캔하는 중입니다...</h3>
+      <p class="text-sm text-slate-500 mt-1">VPC, 서브넷, 보안그룹, EC2, RDS, ELB, S3, Lambda 정보를 수집하고 있습니다. 잠시만 기다려주세요.</p>
+    </div>
+
+    <!-- 결과 대시보드 (스캔 완료 후 표시) -->
+    <div id="result-dashboard" class="hidden space-y-6">
+
+      <!-- 상단 액션 바: 다운로드 및 요약 -->
+      <div class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500 text-slate-950">스캔 완료</span>
+            <h2 class="text-xl font-bold tracking-tight" id="dash-title">AWS 인프라 명세서가 준비되었습니다</h2>
+          </div>
+          <p class="text-xs text-slate-300 mt-1" id="dash-meta">리전: ap-northeast-2 | 스캔 시각: 2026-10-25 15:30:00</p>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <button onclick="downloadExcel()"
+            class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-lg shadow-lg transition flex items-center space-x-2 text-sm">
+            <i class="fa-solid fa-file-excel text-lg"></i>
+            <span>고객사 제출용 엑셀 다운로드 (.xlsx)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI 통계 카드 그리드 -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">VPC</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-vpc">0</p>
+          <span class="text-xs text-blue-600 font-medium">가상 네트워크</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Subnets</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-subnet">0</p>
+          <span class="text-xs text-indigo-600 font-medium">망 분리 서브넷</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Security Groups</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-sg">0</p>
+          <span class="text-xs text-emerald-600 font-medium">보안 방화벽</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">EC2 Servers</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-ec2">0</p>
+          <span class="text-xs text-amber-600 font-medium">가상 컴퓨팅 서버</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">RDS Databases</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-rds">0</p>
+          <span class="text-xs text-rose-600 font-medium">관계형 DB 인스턴스</span>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Load Balancers</p>
+          <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-elb">0</p>
+          <span class="text-xs text-purple-600 font-medium">ALB / NLB 부하분산</span>
+        </div>
+      </div>
+
+      <!-- 탭형 테이블 미리보기 영역 -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- 탭 헤더 -->
+        <div class="border-b border-slate-200 bg-slate-50/50 px-4 flex flex-wrap gap-2 pt-3">
+          <button onclick="switchTab('tab-network')" id="tab-btn-network"
+            class="tab-btn px-4 py-2 text-sm font-semibold border-b-2 border-blue-600 text-blue-600">
+            <i class="fa-solid fa-network-wired mr-1.5"></i> 네트워크 (VPC/Subnet/GW)
+          </button>
+          <button onclick="switchTab('tab-security')" id="tab-btn-security"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-shield-halved mr-1.5"></i> 보안 그룹 (Security Group)
+          </button>
+          <button onclick="switchTab('tab-compute')" id="tab-btn-compute"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-server mr-1.5"></i> 컴퓨팅 (EC2)
+          </button>
+          <button onclick="switchTab('tab-db')" id="tab-btn-db"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-database mr-1.5"></i> 데이터베이스 (RDS)
+          </button>
+          <button onclick="switchTab('tab-elb')" id="tab-btn-elb"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-arrows-split-up-and-left mr-1.5"></i> 로드밸런서 (ELB)
+          </button>
+          <button onclick="switchTab('tab-storage')" id="tab-btn-storage"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-box-archive mr-1.5"></i> S3 & Lambda
+          </button>
+        </div>
+
+        <!-- 탭 컨텐츠 -->
+        <div class="p-6">
+          <!-- 1. 네트워크 탭 -->
+          <div id="tab-network" class="tab-content active space-y-6">
+            <div>
+              <h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center">
+                <span class="w-2 h-2 rounded-full bg-blue-600 mr-2"></span>VPC 목록
+              </h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase">
+                    <tr>
+                      <th class="p-3">이름 (Name)</th>
+                      <th class="p-3">VPC ID</th>
+                      <th class="p-3">IPv4 CIDR</th>
+                      <th class="p-3">구분</th>
+                      <th class="p-3">상태</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-vpc" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center">
+                <span class="w-2 h-2 rounded-full bg-indigo-600 mr-2"></span>서브넷 (Subnet) 목록
+              </h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-72">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                    <tr>
+                      <th class="p-3">이름</th>
+                      <th class="p-3">Subnet ID</th>
+                      <th class="p-3">소속 VPC</th>
+                      <th class="p-3">CIDR</th>
+                      <th class="p-3">가용영역</th>
+                      <th class="p-3">망 구분</th>
+                      <th class="p-3">가용 IP</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-subnet" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 보안 그룹 탭 -->
+          <div id="tab-security" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">보안그룹 이름</th>
+                    <th class="p-3">Group ID</th>
+                    <th class="p-3">소속 VPC</th>
+                    <th class="p-3">인바운드 허용 규칙 요약</th>
+                    <th class="p-3">설명</th>
+                  </tr>
+                </thead>
+                <tbody id="table-sg" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 3. 컴퓨팅 (EC2) 탭 -->
+          <div id="tab-compute" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">인스턴스 이름</th>
+                    <th class="p-3">Instance ID</th>
+                    <th class="p-3">상태</th>
+                    <th class="p-3">타입</th>
+                    <th class="p-3">vCPU</th>
+                    <th class="p-3">RAM</th>
+                    <th class="p-3">Private IP</th>
+                    <th class="p-3">Public IP</th>
+                    <th class="p-3">서브넷 ID</th>
+                    <th class="p-3">가용영역</th>
+                  </tr>
+                </thead>
+                <tbody id="table-ec2" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 4. 데이터베이스 (RDS) 탭 -->
+          <div id="tab-db" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">DB 식별자</th>
+                    <th class="p-3">상태</th>
+                    <th class="p-3">엔진 및 버전</th>
+                    <th class="p-3">인스턴스 클래스</th>
+                    <th class="p-3">스토리지</th>
+                    <th class="p-3">Multi-AZ</th>
+                    <th class="p-3">접속 엔드포인트</th>
+                  </tr>
+                </thead>
+                <tbody id="table-rds" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 5. 로드밸런서 (ELB) 탭 -->
+          <div id="tab-elb" class="tab-content">
+            <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-96">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                  <tr>
+                    <th class="p-3">LB 이름</th>
+                    <th class="p-3">타입</th>
+                    <th class="p-3">스킴</th>
+                    <th class="p-3">상태</th>
+                    <th class="p-3">DNS 엔드포인트</th>
+                    <th class="p-3">리스너 포트</th>
+                  </tr>
+                </thead>
+                <tbody id="table-elb" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 6. S3 & Lambda 탭 -->
+          <div id="tab-storage" class="tab-content space-y-6">
+            <div>
+              <h4 class="text-sm font-bold text-slate-700 mb-2">S3 버킷</h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-48">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                    <tr>
+                      <th class="p-3">버킷 이름</th>
+                      <th class="p-3">리전</th>
+                      <th class="p-3">현재 리전 여부</th>
+                      <th class="p-3">생성 일시</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-s3" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="text-sm font-bold text-slate-700 mb-2">Lambda 함수</h4>
+              <div class="overflow-x-auto rounded-lg border border-slate-200 max-h-48">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-100 text-slate-700 font-semibold uppercase sticky top-0">
+                    <tr>
+                      <th class="p-3">함수 이름</th>
+                      <th class="p-3">런타임</th>
+                      <th class="p-3">메모리</th>
+                      <th class="p-3">타임아웃</th>
+                      <th class="p-3">최근 수정일시</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-lambda" class="divide-y divide-slate-200"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="mt-12 py-6 border-t border-slate-200 text-center text-xs text-slate-400">
+    <p>AWS Infrastructure Specification Generator for CloudShell &bull; Client Delivery Standard</p>
+  </footer>
+
+  <script>
+    let currentScanData = null;
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-blue-600', 'text-blue-600');
+        btn.classList.add('border-transparent', 'text-slate-600');
+      });
+
+      document.getElementById(tabId).classList.add('active');
+      const activeBtn = document.getElementById('tab-btn-' + tabId.replace('tab-', ''));
+      if (activeBtn) {
+        activeBtn.classList.remove('border-transparent', 'text-slate-600');
+        activeBtn.classList.add('border-blue-600', 'text-blue-600');
+      }
+    }
+
+    async function startScan() {
+      const customer = document.getElementById('customer-name').value.trim() || '고객사';
+      const region = document.getElementById('target-region').value;
+
+      document.getElementById('loading-spinner').classList.remove('hidden');
+      document.getElementById('result-dashboard').classList.add('hidden');
+      document.getElementById('btn-scan').disabled = true;
+
+      try {
+        const response = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer: customer, region: region })
+        });
+        const res = await response.json();
+
+        if (res.status === 'success') {
+          currentScanData = res.data;
+          renderDashboard(res.data, customer);
+        } else {
+          alert('스캔 실패: ' + (res.message || '알 수 없는 오류'));
+        }
+      } catch (err) {
+        alert('오류가 발생했습니다: ' + err.message);
+      } finally {
+        document.getElementById('loading-spinner').classList.add('hidden');
+        document.getElementById('btn-scan').disabled = false;
+      }
+    }
+
+    function renderDashboard(data, customer) {
+      document.getElementById('result-dashboard').classList.remove('hidden');
+      document.getElementById('dash-title').innerText = `${customer} AWS 인프라 생성 명세서 준비 완료`;
+      document.getElementById('dash-meta').innerText = `스캔 리전: ${data.metadata.region} | 생성일시: ${data.metadata.scanned_at}`;
+
+      // KPIs
+      document.getElementById('kpi-vpc').innerText = data.summary.vpc_count;
+      document.getElementById('kpi-subnet').innerText = data.summary.subnet_count;
+      document.getElementById('kpi-sg').innerText = data.summary.sg_count;
+      document.getElementById('kpi-ec2').innerText = data.summary.ec2_count;
+      document.getElementById('kpi-rds').innerText = data.summary.rds_count;
+      document.getElementById('kpi-elb').innerText = data.summary.elb_count;
+
+      // Tables
+      // VPC
+      const vpcBody = document.getElementById('table-vpc');
+      vpcBody.innerHTML = (data.vpcs || []).map(v => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${v.name}</td>
+          <td class="p-3 font-mono text-xs">${v.vpc_id}</td>
+          <td class="p-3">${v.cidr}</td>
+          <td class="p-3">${v.is_default}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800">${v.state}</span></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+
+      // Subnet
+      const subBody = document.getElementById('table-subnet');
+      subBody.innerHTML = (data.subnets || []).map(s => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${s.name}</td>
+          <td class="p-3 font-mono text-xs">${s.subnet_id}</td>
+          <td class="p-3 font-mono text-xs">${s.vpc_id}</td>
+          <td class="p-3">${s.cidr}</td>
+          <td class="p-3">${s.az}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs ${s.type === 'Public' ? 'bg-blue-100 text-blue-800 font-semibold' : 'bg-slate-100 text-slate-700'}">${s.type}</span></td>
+          <td class="p-3 font-medium">${s.available_ips}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+
+      // Security Groups
+      const sgBody = document.getElementById('table-sg');
+      sgBody.innerHTML = (data.security_groups || []).map(sg => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${sg.name}</td>
+          <td class="p-3 font-mono text-xs">${sg.group_id}</td>
+          <td class="p-3 font-mono text-xs">${sg.vpc_id}</td>
+          <td class="p-3 text-xs font-mono text-slate-700 whitespace-pre-line">${sg.inbound_rules}</td>
+          <td class="p-3 text-slate-500">${sg.description}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+
+      // EC2
+      const ec2Body = document.getElementById('table-ec2');
+      ec2Body.innerHTML = (data.ec2_instances || []).map(i => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${i.name}</td>
+          <td class="p-3 font-mono text-xs">${i.instance_id}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs ${i.state === 'running' ? 'bg-emerald-100 text-emerald-800 font-semibold' : 'bg-rose-100 text-rose-800'}">${i.state}</span></td>
+          <td class="p-3 font-mono">${i.instance_type}</td>
+          <td class="p-3">${i.vcpu}</td>
+          <td class="p-3">${i.ram_gib} GiB</td>
+          <td class="p-3 font-mono">${i.private_ip}</td>
+          <td class="p-3 font-mono">${i.public_ip}</td>
+          <td class="p-3 font-mono text-xs">${i.subnet_id}</td>
+          <td class="p-3">${i.az}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="10" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+
+      // RDS
+      const rdsBody = document.getElementById('table-rds');
+      rdsBody.innerHTML = (data.rds_instances || []).map(r => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${r.db_id}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800">${r.status}</span></td>
+          <td class="p-3">${r.engine}</td>
+          <td class="p-3 font-mono">${r.db_class}</td>
+          <td class="p-3">${r.storage}</td>
+          <td class="p-3">${r.multi_az}</td>
+          <td class="p-3 font-mono text-xs">${r.endpoint}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="7" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+
+      // ELB
+      const elbBody = document.getElementById('table-elb');
+      elbBody.innerHTML = (data.load_balancers || []).map(l => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${l.name}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-800">${l.type}</span></td>
+          <td class="p-3">${l.scheme}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800">${l.state}</span></td>
+          <td class="p-3 font-mono text-xs truncate max-w-xs">${l.dns_name}</td>
+          <td class="p-3 font-mono">${l.listeners}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+
+      // S3
+      const s3Body = document.getElementById('table-s3');
+      s3Body.innerHTML = (data.s3_buckets || []).map(b => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${b.name}</td>
+          <td class="p-3">${b.region}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-xs ${b.is_current_region === '예' ? 'bg-emerald-100 text-emerald-800 font-bold' : 'bg-slate-100 text-slate-600'}">${b.is_current_region}</span></td>
+          <td class="p-3">${b.created_at}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="4" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+
+      // Lambda
+      const lambdaBody = document.getElementById('table-lambda');
+      lambdaBody.innerHTML = (data.lambda_functions || []).map(f => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-semibold text-slate-800">${f.name}</td>
+          <td class="p-3 font-mono text-xs">${f.runtime}</td>
+          <td class="p-3">${f.memory}</td>
+          <td class="p-3">${f.timeout}</td>
+          <td class="p-3">${f.last_modified}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="p-4 text-center text-slate-400">자원 없음</td></tr>';
+    }
+
+    function downloadExcel() {
+      if (!currentScanData) {
+        alert('먼저 인프라 스캔을 실행해주세요.');
+        return;
+      }
+      const customer = document.getElementById('customer-name').value.trim() || '고객사';
+      const region = currentScanData.metadata.region;
+      window.location.href = `/api/download?customer=${encodeURIComponent(customer)}&region=${encodeURIComponent(region)}`;
+    }
+  </script>
+</body>
+</html>
