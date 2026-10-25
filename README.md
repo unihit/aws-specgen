@@ -29,11 +29,11 @@
 ### [Step 1] 고객사 AWS CloudShell에서 실행
 
 1. 고객사 AWS 콘솔 상단의 **CloudShell** 아이콘을 클릭하여 터미널을 엽니다.
-2. `scan_cloudshell.py` 스크립트를 생성하거나 실행합니다 (외부 라이브러리 설치 불필요):
+2. 터미널에 아래 **원라이너 명령어**를 복사-붙여넣기하여 즉시 실행합니다 (외부 라이브러리 설치 불필요):
 
 ```bash
-# CloudShell 터미널에서 실행
-python3 scan_cloudshell.py
+# CloudShell에서 1줄로 스크립트 다운로드 및 즉시 스캔
+curl -sLO https://raw.githubusercontent.com/unihit/aws-specgen/main/scan_cloudshell.py && python3 scan_cloudshell.py
 ```
 
 3. 실행 완료 후 화면에 표시된 파일명을 확인합니다 (예: `aws_spec_ap-northeast-2.json`).
